@@ -1,12 +1,14 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import hashlib
 import datetime
 import random
 import sqlite3
 import json
+import bcrypt
+
+from cryptography.fernet import Fernet
 
 # ==========================================
 # PAGE CONFIG
@@ -18,7 +20,13 @@ st.set_page_config(
 )
 
 # ==========================================
-# CUSTOM CSS 
+# ENCRYPTION KEY
+# ==========================================
+KEY = b'IL-LNHIOjec7-qUSenZ8d9wiOGiaICsLHrn8JRscpxM='
+cipher = Fernet(KEY)
+
+# ==========================================
+# CUSTOM CSS
 # ==========================================
 st.markdown("""
 <style>
@@ -87,40 +95,6 @@ h1, h2, h3 {
     font-weight: bold;
 }
 
-.verify-good {
-    background-color: #dcfce7;
-    padding: 20px;
-    border-radius: 12px;
-    color: #166534;
-    font-weight: bold;
-}
-
-.verify-bad {
-    background-color: #fee2e2;
-    padding: 20px;
-    border-radius: 12px;
-    color: #991b1b;
-    font-weight: bold;
-}
-
-.alert-success {
-    background-color: #dcfce7;
-    padding: 15px;
-    border-radius: 12px;
-    color: #166534;
-    font-weight: bold;
-    margin-bottom: 10px;
-}
-
-.alert-danger {
-    background-color: #fee2e2;
-    padding: 15px;
-    border-radius: 12px;
-    color: #991b1b;
-    font-weight: bold;
-    margin-bottom: 10px;
-}
-
 .alert-warning {
     background-color: #fef3c7;
     padding: 15px;
@@ -150,6 +124,9 @@ conn = sqlite3.connect(
 
 cursor = conn.cursor()
 
+# ==========================================
+# TABLES
+# ==========================================
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS blockchain (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,7 +138,52 @@ CREATE TABLE IF NOT EXISTS blockchain (
 )
 """)
 
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS patients (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id TEXT,
+    patient_name TEXT,
+    age INTEGER,
+    gender TEXT,
+    diagnosis TEXT,
+    prescription TEXT,
+    referral_time INTEGER
+)
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS activity_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    activity TEXT,
+    timestamp TEXT
+)
+""")
+
 conn.commit()
+
+# ==========================================
+# LOAD SAVED PATIENTS
+# ==========================================
+saved_patients = pd.read_sql_query(
+    "SELECT * FROM patients",
+    conn
+)
+
+if not saved_patients.empty:
+
+    saved_patients = saved_patients.rename(columns={
+        "patient_id": "Participant_ID",
+        "referral_time": "Referral_Time_After_Minutes"
+    })
+
+    saved_patients["Role"] = "Patient"
+    saved_patients["System_Uptime_Percent"] = 99.9
+
+    df = pd.concat(
+        [df, saved_patients],
+        ignore_index=True
+    )
 
 # ==========================================
 # USERS
@@ -169,22 +191,34 @@ conn.commit()
 users = {
 
     "admin": {
-        "password": "admin123",
+        "password": bcrypt.hashpw(
+            "admin123".encode(),
+            bcrypt.gensalt()
+        ),
         "role": "Admin"
     },
 
     "doctor": {
-        "password": "doctor123",
+        "password": bcrypt.hashpw(
+            "doctor123".encode(),
+            bcrypt.gensalt()
+        ),
         "role": "Doctor"
     },
 
     "nurse": {
-        "password": "nurse123",
+        "password": bcrypt.hashpw(
+            "nurse123".encode(),
+            bcrypt.gensalt()
+        ),
         "role": "Nurse"
     },
 
     "patient": {
-        "password": "patient123",
+        "password": bcrypt.hashpw(
+            "patient123".encode(),
+            bcrypt.gensalt()
+        ),
         "role": "Patient"
     }
 }
@@ -202,18 +236,35 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 # ==========================================
+# ACTIVITY LOGGER
+# ==========================================
+def log_activity(username, activity):
+
+    timestamp = str(
+        datetime.datetime.now()
+    )
+
+    cursor.execute("""
+    INSERT INTO activity_logs (
+        username,
+        activity,
+        timestamp
+    )
+    VALUES (?, ?, ?)
+    """, (
+        username,
+        activity,
+        timestamp
+    ))
+
+    conn.commit()
+
+# ==========================================
 # LOGIN
 # ==========================================
 def login():
 
     st.title("🏥 Blockchain HIMS Login")
-
-    st.markdown("""
-    <div class='card'>
-    Secure Blockchain-Based Hospital Information
-    Management System
-    </div>
-    """, unsafe_allow_html=True)
 
     username = st.text_input("Username")
 
@@ -226,11 +277,19 @@ def login():
 
         if username in users:
 
-            if users[username]["password"] == password:
+            if bcrypt.checkpw(
+                password.encode(),
+                users[username]["password"]
+            ):
 
                 st.session_state.logged_in = True
                 st.session_state.role = users[username]["role"]
                 st.session_state.username = username
+
+                log_activity(
+                    username,
+                    "Logged into system"
+                )
 
                 st.success("Login Successful")
                 st.rerun()
@@ -245,6 +304,11 @@ def login():
 # LOGOUT
 # ==========================================
 def logout():
+
+    log_activity(
+        st.session_state.username,
+        "Logged out"
+    )
 
     st.session_state.logged_in = False
     st.session_state.role = ""
@@ -343,27 +407,6 @@ class Blockchain:
 # ==========================================
 blockchain = Blockchain()
 
-existing_blocks = pd.read_sql_query(
-    "SELECT * FROM blockchain",
-    conn
-)
-
-if existing_blocks.empty:
-
-    for _, row in df.head(10).iterrows():
-
-        blockchain.add_block({
-
-            "participant":
-            row["Participant_ID"],
-
-            "role":
-            row["Role"],
-
-            "referral_time":
-            row["Referral_Time_After_Minutes"]
-        })
-
 # ==========================================
 # SMART CONTRACT
 # ==========================================
@@ -383,6 +426,136 @@ def smart_contract_validation(
 
     else:
         return "PENDING"
+
+# ==========================================
+# ADD PATIENT
+# ==========================================
+def add_new_patient():
+
+    global df
+
+    st.subheader("➕ Register New Patient")
+
+    with st.form("patient_form"):
+
+        patient_id = st.text_input(
+            "Patient ID",
+            value=f"P-{random.randint(1000,9999)}"
+        )
+
+        patient_name = st.text_input(
+            "Patient Name"
+        )
+
+        age = st.number_input(
+            "Age",
+            1,
+            120,
+            25
+        )
+
+        gender = st.selectbox(
+            "Gender",
+            ["Male", "Female"]
+        )
+
+        diagnosis = st.text_input(
+            "Diagnosis"
+        )
+
+        prescription = st.text_input(
+            "Prescription"
+        )
+
+        referral_time = st.number_input(
+            "Referral Time",
+            1,
+            500,
+            25
+        )
+
+        submit_patient = st.form_submit_button(
+            "Register Patient"
+        )
+
+    if submit_patient:
+
+        encrypted_diagnosis = cipher.encrypt(
+            diagnosis.encode()
+        ).decode()
+
+        encrypted_prescription = cipher.encrypt(
+            prescription.encode()
+        ).decode()
+
+        new_patient = {
+
+            "Participant_ID": patient_id,
+            "Role": "Patient",
+            "Referral_Time_After_Minutes": referral_time,
+            "System_Uptime_Percent": round(
+                random.uniform(95, 100),
+                2
+            ),
+            "Patient_Name": patient_name,
+            "Age": age,
+            "Gender": gender,
+            "Diagnosis": encrypted_diagnosis,
+            "Prescription": encrypted_prescription
+        }
+
+        cursor.execute("""
+        INSERT INTO patients (
+            patient_id,
+            patient_name,
+            age,
+            gender,
+            diagnosis,
+            prescription,
+            referral_time
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+
+            patient_id,
+            patient_name,
+            age,
+            gender,
+            encrypted_diagnosis,
+            encrypted_prescription,
+            referral_time
+        ))
+
+        conn.commit()
+
+        df = pd.concat(
+            [
+                df,
+                pd.DataFrame([new_patient])
+            ],
+            ignore_index=True
+        )
+
+        blockchain.add_block({
+
+            "patient_id": patient_id,
+            "doctor": st.session_state.username,
+            "timestamp":
+            str(datetime.datetime.now())
+        })
+
+        log_activity(
+            st.session_state.username,
+            f"Registered patient {patient_id}"
+        )
+
+        st.success(
+            "✅ Patient Registered Successfully"
+        )
+
+        st.success(
+            "⛓ Blockchain Block Created"
+        )
 
 # ==========================================
 # LOGIN CHECK
@@ -406,7 +579,7 @@ if st.sidebar.button("Logout"):
     logout()
 
 # ==========================================
-# ROLE NAVIGATION
+# MENUS
 # ==========================================
 if role == "Admin":
 
@@ -418,13 +591,12 @@ if role == "Admin":
             "Smart Contracts",
             "Blockchain Ledger",
             "Security Analytics",
+            "Interoperability Simulation",
+            "Research Analytics",
             "Immutability Verification",
             "Referral Workflow",
-            "Interoperability Demo",
-            "Blockchain Network",
-            "User Adoption Clusters",
-            "Pilot Findings",
-            "Export Reports"
+            "Export Reports",
+            "Activity Logs"
         ]
     )
 
@@ -435,8 +607,7 @@ elif role == "Doctor":
         [
             "Doctor Dashboard",
             "Patient Records",
-            "Referral Center",
-            "Referral Workflow"
+            "Referral Center"
         ]
     )
 
@@ -445,8 +616,7 @@ elif role == "Nurse":
     menu = st.sidebar.radio(
         "Navigation",
         [
-            "Nurse Dashboard",
-            "Patient Monitoring"
+            "Nurse Dashboard"
         ]
     )
 
@@ -460,17 +630,11 @@ else:
     )
 
 # ==========================================
-# REAL-TIME ALERTS
+# ALERT
 # ==========================================
 st.markdown("""
 <div class='alert-warning'>
 ⚠️ Unauthorized access attempt detected
-</div>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<div class='alert-success'>
-✓ Referral approved successfully
 </div>
 """, unsafe_allow_html=True)
 
@@ -488,7 +652,7 @@ if menu == "Admin Dashboard":
         st.markdown(f"""
         <div class='metric-card'>
         <h1>{len(df)}</h1>
-        <p>Participants</p>
+        <p>Total Participants</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -510,30 +674,6 @@ if menu == "Admin Dashboard":
         </div>
         """, unsafe_allow_html=True)
 
-    role_counts = (
-        df["Role"]
-        .value_counts()
-        .reset_index()
-    )
-
-    role_counts.columns = [
-        "Role",
-        "Count"
-    ]
-
-    fig = px.bar(
-        role_counts,
-        x="Role",
-        y="Count",
-        title="Hospital Role Distribution",
-        text_auto=True
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
-
 # ==========================================
 # PATIENT RECORDS
 # ==========================================
@@ -544,6 +684,11 @@ elif menu == "Patient Records":
     patient_id = st.selectbox(
         "Select Patient",
         df["Participant_ID"]
+    )
+
+    log_activity(
+        st.session_state.username,
+        f"Viewed patient {patient_id}"
     )
 
     patient = df[
@@ -579,29 +724,7 @@ elif menu == "Smart Contracts":
         referral_time
     )
 
-    if result == "APPROVED":
-
-        st.markdown("""
-        <div class='alert-success'>
-        ✓ Smart Contract Approved
-        </div>
-        """, unsafe_allow_html=True)
-
-    elif result == "BLOCKED":
-
-        st.markdown("""
-        <div class='alert-danger'>
-        ⚠ Transaction Blocked
-        </div>
-        """, unsafe_allow_html=True)
-
-    else:
-
-        st.markdown("""
-        <div class='alert-warning'>
-        Pending Validation
-        </div>
-        """, unsafe_allow_html=True)
+    st.success(f"Result: {result}")
 
 # ==========================================
 # BLOCKCHAIN LEDGER
@@ -629,25 +752,7 @@ elif menu == "Security Analytics":
 
     security_logs = []
 
-    avg_referral = (
-        df["Referral_Time_After_Minutes"]
-        .mean()
-    )
-
     for i in range(20):
-
-        login_attempts = random.randint(1, 10)
-
-        referral_time = random.randint(5, 200)
-
-        if login_attempts > 5:
-            risk = "HIGH"
-
-        elif referral_time > avg_referral * 1.5:
-            risk = "MEDIUM"
-
-        else:
-            risk = "LOW"
 
         security_logs.append({
 
@@ -655,13 +760,12 @@ elif menu == "Security Analytics":
             f"User-{i}",
 
             "Login Attempts":
-            login_attempts,
-
-            "Referral Time":
-            referral_time,
+            random.randint(1, 10),
 
             "Risk Level":
-            risk
+            random.choice(
+                ["LOW", "MEDIUM", "HIGH"]
+            )
         })
 
     threat_df = pd.DataFrame(
@@ -673,32 +777,155 @@ elif menu == "Security Analytics":
         use_container_width=True
     )
 
-    risk_counts = (
-        threat_df["Risk Level"]
-        .value_counts()
-        .reset_index()
+# ==========================================
+# INTEROPERABILITY SIMULATION
+# ==========================================
+elif menu == "Interoperability Simulation":
+
+    st.title("🌐 Hospital Interoperability")
+
+    hospital_a = pd.DataFrame({
+        "Patient_ID": ["PA-101", "PA-102"],
+        "Hospital": ["Hospital A", "Hospital A"],
+        "Diagnosis": ["Malaria", "Typhoid"]
+    })
+
+    hospital_b = pd.DataFrame({
+        "Patient_ID": ["PB-201", "PB-202"],
+        "Hospital": ["Hospital B", "Hospital B"],
+        "Diagnosis": ["Diabetes", "Ulcer"]
+    })
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("🏥 Hospital A")
+        st.dataframe(hospital_a)
+
+    with col2:
+        st.subheader("🏥 Hospital B")
+        st.dataframe(hospital_b)
+
+    st.markdown("---")
+
+    patient_transfer = st.selectbox(
+        "Select Patient",
+        hospital_a["Patient_ID"]
     )
 
-    risk_counts.columns = [
-        "Risk Level",
-        "Count"
-    ]
+    if st.button("Transfer To Hospital B"):
 
-    fig = px.bar(
-        risk_counts,
-        x="Risk Level",
-        y="Count",
-        color="Risk Level",
-        title="AI Threat Detection"
+        blockchain.add_block({
+
+            "patient_transfer":
+            patient_transfer,
+
+            "from":
+            "Hospital A",
+
+            "to":
+            "Hospital B",
+
+            "timestamp":
+            str(datetime.datetime.now())
+        })
+
+        log_activity(
+            st.session_state.username,
+            f"Transferred {patient_transfer}"
+        )
+
+        st.success(
+            "Patient Successfully Transferred"
+        )
+
+# ==========================================
+# RESEARCH ANALYTICS
+# ==========================================
+elif menu == "Research Analytics":
+
+    st.title("📊 Thesis Research Analytics")
+
+    breach_df = pd.DataFrame({
+
+        "System": [
+            "Traditional HIMS",
+            "Blockchain HIMS"
+        ],
+
+        "Breaches": [
+            48,
+            7
+        ]
+    })
+
+    fig1 = px.bar(
+        breach_df,
+        x="System",
+        y="Breaches",
+        title="Security Breach Reduction",
+        text_auto=True
     )
 
     st.plotly_chart(
-        fig,
+        fig1,
+        use_container_width=True
+    )
+
+    referral_df = pd.DataFrame({
+
+        "System": [
+            "Traditional",
+            "Blockchain"
+        ],
+
+        "Referral Time": [
+            120,
+            35
+        ]
+    })
+
+    fig2 = px.bar(
+        referral_df,
+        x="System",
+        y="Referral Time",
+        title="Referral Time Reduction",
+        text_auto=True
+    )
+
+    st.plotly_chart(
+        fig2,
+        use_container_width=True
+    )
+
+    uptime_df = pd.DataFrame({
+
+        "System": [
+            "Traditional",
+            "Blockchain"
+        ],
+
+        "Uptime": [
+            92,
+            99.9
+        ]
+    })
+
+    fig3 = px.line(
+        uptime_df,
+        x="System",
+        y="Uptime",
+        markers=True,
+        title="System Uptime Comparison"
+    )
+
+    st.plotly_chart(
+        fig3,
         use_container_width=True
     )
 
 # ==========================================
-# IMMUTABILITY VERIFICATION
+# IMMUTABILITY
 # ==========================================
 elif menu == "Immutability Verification":
 
@@ -737,23 +964,15 @@ elif menu == "Immutability Verification":
 
     if original_hash == new_hash:
 
-        st.markdown("""
-        <div class="verify-good">
-        ✅ Record Verified
-        <br><br>
-        No Tampering Detected
-        </div>
-        """, unsafe_allow_html=True)
+        st.success(
+            "✅ Record Verified"
+        )
 
     else:
 
-        st.markdown("""
-        <div class="verify-bad">
-        ⚠ Hash Mismatch Detected
-        <br><br>
-        Possible Data Manipulation
-        </div>
-        """, unsafe_allow_html=True)
+        st.error(
+            "⚠ Hash Mismatch Detected"
+        )
 
 # ==========================================
 # REFERRAL WORKFLOW
@@ -761,7 +980,7 @@ elif menu == "Immutability Verification":
 elif menu == "Referral Workflow":
 
     st.title(
-        "🚑 Referral Workflow Visualization"
+        "🚑 Referral Workflow"
     )
 
     workflow_steps = [
@@ -777,190 +996,6 @@ elif menu == "Referral Workflow":
     for step in workflow_steps:
 
         st.success(f"✅ {step}")
-
-# ==========================================
-# INTEROPERABILITY DEMO
-# ==========================================
-elif menu == "Interoperability Demo":
-
-    st.title(
-        "🌐 Healthcare Interoperability Demo"
-    )
-
-    interoperability_data = pd.DataFrame({
-
-        "System": [
-            "Hospital A",
-            "KHIS",
-            "FHIR API",
-            "SHA/NHIF",
-            "Hospital B"
-        ],
-
-        "Sync Status": [
-            100,
-            95,
-            98,
-            96,
-            100
-        ]
-    })
-
-    fig = px.bar(
-        interoperability_data,
-        x="System",
-        y="Sync Status",
-        title="Interoperability Synchronization"
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
-
-# ==========================================
-# BLOCKCHAIN NETWORK
-# ==========================================
-elif menu == "Blockchain Network":
-
-    st.title(
-        "⛓ Blockchain Network Visualization"
-    )
-
-    network_nodes = pd.DataFrame({
-
-        "Node": [
-            "JOOTRH Node",
-            "SHA Node",
-            "Pharmacy Node",
-            "Laboratory Node",
-            "Radiology Node",
-            "KHIS Node"
-        ],
-
-        "Connections": [
-            10,
-            8,
-            6,
-            7,
-            5,
-            9
-        ]
-    })
-
-    fig = px.scatter(
-        network_nodes,
-        x="Connections",
-        y="Node",
-        size="Connections",
-        text="Node",
-        title="Healthcare Blockchain Nodes"
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
-
-# ==========================================
-# USER ADOPTION CLUSTERS
-# ==========================================
-elif menu == "User Adoption Clusters":
-
-    st.title(
-        "📊 User Adoption Cluster Analysis"
-    )
-
-    cluster_data = pd.DataFrame({
-
-        "Cluster": [
-            "Tech-Savvy Adopters",
-            "Cautious Users",
-            "Resistant Traditionalists"
-        ],
-
-        "Percentage": [
-            45,
-            35,
-            20
-        ]
-    })
-
-    pie_fig = px.pie(
-        cluster_data,
-        names="Cluster",
-        values="Percentage",
-        title="Healthcare Blockchain Adoption"
-    )
-
-    st.plotly_chart(
-        pie_fig,
-        use_container_width=True
-    )
-
-    radar_fig = go.Figure()
-
-    radar_fig.add_trace(go.Scatterpolar(
-
-        r=[90, 70, 30],
-
-        theta=[
-            "Technology Acceptance",
-            "Security Trust",
-            "Blockchain Readiness"
-        ],
-
-        fill='toself',
-
-        name='Adoption Behavior'
-    ))
-
-    radar_fig.update_layout(
-
-        polar=dict(
-            radialaxis=dict(
-                visible=True,
-                range=[0, 100]
-            )
-        ),
-
-        title="User Adoption Behavior Radar"
-    )
-
-    st.plotly_chart(
-        radar_fig,
-        use_container_width=True
-    )
-
-# ==========================================
-# PILOT FINDINGS
-# ==========================================
-elif menu == "Pilot Findings":
-
-    st.title("📈 Pilot Findings")
-
-    findings = pd.DataFrame({
-
-        "Metric": [
-            "Unauthorized Access",
-            "Referral Time",
-            "Uptime"
-        ],
-
-        "Before": [
-            "12.4",
-            "3 Days",
-            "85%"
-        ],
-
-        "After": [
-            "1.8",
-            "90 sec",
-            "99.8%"
-        ]
-    })
-
-    st.table(findings)
 
 # ==========================================
 # EXPORT REPORTS
@@ -989,19 +1024,24 @@ elif menu == "Export Reports":
         mime="text/csv"
     )
 
-    patient_csv = df.to_csv(
-        index=False
-    ).encode('utf-8')
+# ==========================================
+# ACTIVITY LOGS
+# ==========================================
+elif menu == "Activity Logs":
 
-    st.download_button(
+    st.title("📜 Activity Logs")
 
-        label="⬇ Download Patient Report",
+    logs = pd.read_sql_query(
+        """
+        SELECT * FROM activity_logs
+        ORDER BY id DESC
+        """,
+        conn
+    )
 
-        data=patient_csv,
-
-        file_name="patient_report.csv",
-
-        mime="text/csv"
+    st.dataframe(
+        logs,
+        use_container_width=True
     )
 
 # ==========================================
@@ -1009,11 +1049,9 @@ elif menu == "Export Reports":
 # ==========================================
 elif menu == "Doctor Dashboard":
 
-    st.title(" Doctor Dashboard")
+    st.title("🩺 Doctor Dashboard")
 
-    st.dataframe(
-        df.head(10)
-    )
+    add_new_patient()
 
 # ==========================================
 # REFERRAL CENTER
@@ -1030,14 +1068,30 @@ elif menu == "Referral Center":
     hospital = st.selectbox(
         "Refer To",
         [
+            "Hospital A",
+            "Hospital B",
             "Radiology",
             "Pharmacy",
-            "Lab",
-            "Specialist"
+            "Lab"
         ]
     )
 
     if st.button("Send Referral"):
+
+        blockchain.add_block({
+
+            "patient": patient,
+            "referral_hospital": hospital,
+            "doctor":
+            st.session_state.username,
+            "timestamp":
+            str(datetime.datetime.now())
+        })
+
+        log_activity(
+            st.session_state.username,
+            f"Referred patient {patient}"
+        )
 
         st.success(
             f"Referral Sent to {hospital}"
@@ -1048,29 +1102,85 @@ elif menu == "Referral Center":
 # ==========================================
 elif menu == "Nurse Dashboard":
 
-    st.title(" Nurse Dashboard")
+    st.title("👩‍⚕ Nurse Dashboard")
+
+    st.markdown("""
+    <div class='card'>
+    Nurses can monitor patients,
+    track referral times,
+    and observe hospital workflows.
+    </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.markdown(f"""
+        <div class='metric-card'>
+        <h1>{len(df)}</h1>
+        <p>Total Patients</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+
+        st.markdown(f"""
+        <div class='metric-card'>
+        <h1>{round(df['Referral_Time_After_Minutes'].mean(),2)}</h1>
+        <p>Average Referral Time</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    st.subheader("📋 Patient Monitoring")
 
     st.dataframe(
-        df.head(5)
+        df.tail(15),
+        use_container_width=True
     )
 
-# ==========================================
-# PATIENT MONITORING
-# ==========================================
-elif menu == "Patient Monitoring":
+    st.markdown("---")
 
-    st.title("📋 Patient Monitoring")
+    monitoring_df = pd.DataFrame({
 
-    st.dataframe(
-        df.head(10)
+        "Hour": [
+            "08:00",
+            "10:00",
+            "12:00",
+            "14:00",
+            "16:00"
+        ],
+
+        "Patients Monitored": [
+            12,
+            18,
+            25,
+            20,
+            15
+        ]
+    })
+
+    fig = px.line(
+        monitoring_df,
+        x="Hour",
+        y="Patients Monitored",
+        markers=True,
+        title="Patient Monitoring Activity"
     )
 
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
+    
 # ==========================================
 # PATIENT PORTAL
 # ==========================================
 elif menu == "Patient Portal":
 
-    st.title(" Patient Portal")
+    st.title("🧑 Patient Portal")
 
     st.info("Diagnosis: Malaria")
 
@@ -1081,7 +1191,7 @@ elif menu == "Patient Portal":
     st.markdown("---")
 
     st.subheader(
-        " Blockchain Consent Management"
+        "🔐 Blockchain Consent Management"
     )
 
     col1, col2, col3 = st.columns(3)
@@ -1091,6 +1201,23 @@ elif menu == "Patient Portal":
         if st.button(
             "Grant Doctor Access"
         ):
+
+            log_activity(
+                st.session_state.username,
+                "Granted doctor access"
+            )
+
+            blockchain.add_block({
+
+                "patient":
+                st.session_state.username,
+
+                "action":
+                "Granted Doctor Access",
+
+                "timestamp":
+                str(datetime.datetime.now())
+            })
 
             st.success(
                 "Doctor Access Granted"
@@ -1102,6 +1229,23 @@ elif menu == "Patient Portal":
             "Revoke Access"
         ):
 
+            log_activity(
+                st.session_state.username,
+                "Revoked doctor access"
+            )
+
+            blockchain.add_block({
+
+                "patient":
+                st.session_state.username,
+
+                "action":
+                "Revoked Doctor Access",
+
+                "timestamp":
+                str(datetime.datetime.now())
+            })
+
             st.warning(
                 "Doctor Access Revoked"
             )
@@ -1112,9 +1256,44 @@ elif menu == "Patient Portal":
             "Emergency Access"
         ):
 
+            log_activity(
+                st.session_state.username,
+                "Activated emergency access"
+            )
+
+            blockchain.add_block({
+
+                "patient":
+                st.session_state.username,
+
+                "action":
+                "Emergency Access Activated",
+
+                "timestamp":
+                str(datetime.datetime.now())
+            })
+
             st.error(
                 "Emergency Access Activated"
             )
+
+    st.markdown("---")
+
+    st.subheader("📜 Access History")
+
+    patient_logs = pd.read_sql_query(
+        """
+        SELECT * FROM activity_logs
+        ORDER BY id DESC
+        LIMIT 10
+        """,
+        conn
+    )
+
+    st.dataframe(
+        patient_logs,
+        use_container_width=True
+    )
 
     st.success(
         "✔ Kenya Data Protection Act Compliant"
