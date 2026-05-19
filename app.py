@@ -104,6 +104,36 @@ h1, h2, h3 {
     margin-bottom: 10px;
 }
 
+/* ==========================================
+HIDE STREAMLIT DEFAULT MENU & FOOTER
+========================================== */
+
+#MainMenu {
+    visibility: hidden;
+}
+
+footer {
+    visibility: hidden;
+}
+
+header {
+    visibility: hidden;
+}
+
+/* Optional:
+Hide "Deploy" button
+*/
+[data-testid="stToolbar"] {
+    visibility: hidden;
+}
+
+/* Optional:
+Hide Streamlit top-right decoration
+*/
+[data-testid="stDecoration"] {
+    display: none;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
