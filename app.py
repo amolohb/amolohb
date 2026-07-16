@@ -677,7 +677,7 @@ else:
 # ==========================================
 if menu == "Admin Dashboard":
 
-    st.title("🏥 Admin Dashboard")
+    st.title("🏥 Admin Dashboard (Bernard Amollo)")
 
     col1, col2, col3 = st.columns(3)
 
@@ -687,6 +687,7 @@ if menu == "Admin Dashboard":
         <div class='metric-card'>
         <h1>{len(df)}</h1>
         <p>Total Participants</p>
+        <p>IT staff(admin), Doctors, Nurses, Patients</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -696,6 +697,7 @@ if menu == "Admin Dashboard":
         <div class='metric-card'>
         <h1>{round(df['System_Uptime_Percent'].mean(),2)}%</h1>
         <p>Average Uptime</p>
+        <p>(Percentage)</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -705,6 +707,7 @@ if menu == "Admin Dashboard":
         <div class='metric-card'>
         <h1>{round(df['Referral_Time_After_Minutes'].mean(),2)}</h1>
         <p>Average Referral Time</p>
+        <p>(Minutes)</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -878,7 +881,7 @@ elif menu == "Interoperability Simulation":
 # ==========================================
 elif menu == "Research Analytics":
 
-    st.title("📊 Thesis Research Analytics")
+    st.title("📊 Amollo's Thesis Research Analytics")
 
     breach_df = pd.DataFrame({
 
