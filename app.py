@@ -1143,23 +1143,23 @@ elif menu == "Nurse Dashboard":
 # Instead of a plain white block, try a subtle, styled tip container:
 import streamlit as st
 
-# 1. Inject the custom CSS for the .card class
+# 1. Inject the custom CSS for the .card class with a blue text color
 st.markdown("""
     <style>
     .card {
-        background-color: #1d4ed8;       /* Dark slate background */
-        border-left: 5px solid #2563eb;  /* Accent blue left border matching your KPIs */
+        background-color: #111827;       /* Dark background to make the blue pop */
+        border: 1px solid #1f2937;       /* Subtle dark border */
         padding: 16px 20px;              /* Comfortable spacing inside the card */
-        border-radius: 8px;              /* Rounded corners */
-        color: #f8fafc;                  /* High-contrast off-white text */
+        border-radius: 8px;              /* Rounded corners matching Streamlit elements */
+        color: #3b82f6;                  /* Beautiful vibrant blue font color */
         font-size: 15px;                 /* Clear, readable text size */
-        line-height: 1.5;                /* Improved line spacing */
+        line-height: 1.5;                /* Clean spacing between lines */
         margin-bottom: 20px;             /* Spacing below the card */
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Render your card (make sure to set unsafe_allow_html=True here too!)
+# 2. Render your card
 st.markdown("""
     <div class='card'>
     💡 <strong>Nurse Operations:</strong> Nurses can monitor patients, 
