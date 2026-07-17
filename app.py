@@ -1147,7 +1147,7 @@ import streamlit as st
 st.markdown("""
     <style>
     .card {
-        background-color: #1e293b;       /* Dark slate background */
+        background-color: #1d4ed8;       /* Dark slate background */
         border-left: 5px solid #2563eb;  /* Accent blue left border matching your KPIs */
         padding: 16px 20px;              /* Comfortable spacing inside the card */
         border-radius: 8px;              /* Rounded corners */
