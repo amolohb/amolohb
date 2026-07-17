@@ -1145,7 +1145,7 @@ import streamlit as st
 
 # 2. Render your card
 st.markdown("""
-    <div class='card'>
+    <div class='metric-card'>
     💡 def blue_text(text):
     return f"\033[94m{<strong>Nurse Operations:</strong> Nurses can monitor patients, 
     track referral times, and observe hospital workflows in real-time.}\033[0m"
