@@ -1140,14 +1140,32 @@ elif menu == "Referral Center":
 elif menu == "Nurse Dashboard":
 
     st.title("👩‍⚕ Nurse Dashboard")
+# Instead of a plain white block, try a subtle, styled tip container:
+import streamlit as st
 
-    st.markdown("""
+# 1. Inject the custom CSS for the .card class
+st.markdown("""
+    <style>
+    .card {
+        background-color: #1e293b;       /* Dark slate background */
+        border-left: 5px solid #2563eb;  /* Accent blue left border matching your KPIs */
+        padding: 16px 20px;              /* Comfortable spacing inside the card */
+        border-radius: 8px;              /* Rounded corners */
+        color: #f8fafc;                  /* High-contrast off-white text */
+        font-size: 15px;                 /* Clear, readable text size */
+        line-height: 1.5;                /* Improved line spacing */
+        margin-bottom: 20px;             /* Spacing below the card */
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# 2. Render your card (make sure to set unsafe_allow_html=True here too!)
+st.markdown("""
     <div class='card'>
-    Nurses can monitor patients,
-    track referral times,
-    and observe hospital workflows.
+    💡 <strong>Nurse Operations:</strong> Nurses can monitor patients, 
+    track referral times, and observe hospital workflows in real-time.
     </div>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
