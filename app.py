@@ -1162,8 +1162,9 @@ st.markdown("""
 # 2. Render your card
 st.markdown("""
     <div class='card'>
-    💡 <strong>Nurse Operations:</strong> Nurses can monitor patients, 
-    track referral times, and observe hospital workflows in real-time.
+    💡 def blue_text(text):
+    return f"\033[94m{<strong>Nurse Operations:</strong> Nurses can monitor patients, 
+    track referral times, and observe hospital workflows in real-time.}\033[0m"
     </div>
 """, unsafe_allow_html=True)
 
