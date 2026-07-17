@@ -614,20 +614,38 @@ if st.sidebar.button("Logout"):
 if role == "Admin":
 
     menu = st.sidebar.radio(
-        "Navigation",
-        [
-            "Admin Dashboard",
-            "Patient Records",
-            "Smart Contracts",
-            "Blockchain Ledger",
-            "Security Analytics",
-            "Interoperability Simulation",
-            "Research Analytics",
-            "Immutability Verification",
-            "Referral Workflow",
-            "Export Reports",
-            "Activity Logs"
-        ]
+        "Navigation",import streamlit as st
+
+# Define your page functions
+def admin_dashboard():
+    st.title("Admin Dashboard")
+    st.write("Welcome, Bernard!")
+
+def patient_records():
+    st.title("Patient Records")
+
+def smart_contracts():
+    st.title("Smart Contracts Ledger")
+
+def research_analytics():
+    st.title("Research Analytics")
+
+# Define the navigation structure with clean, labeled categories
+pg = st.navigation({
+    "📋 Clinical Workflows": [
+        st.Page(admin_dashboard, title="Admin Dashboard", icon="🏥"),
+        st.Page(patient_records, title="Patient Records", icon="📁")
+    ],
+    "⛓️ Blockchain & Security": [
+        st.Page(smart_contracts, title="Smart Contracts", icon="🔒"),
+    ],
+    "📊 System & Research": [
+        st.Page(research_analytics, title="Research Analytics", icon="📈")
+    ]
+})
+
+# Run the selected page
+pg.run()
     )
 
 elif role == "Doctor":
