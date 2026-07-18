@@ -614,38 +614,20 @@ if st.sidebar.button("Logout"):
 if role == "Admin":
 
     menu = st.sidebar.radio(
-        "Navigation",import streamlit as st
-
-# Define your page functions
-def admin_dashboard():
-    st.title("Admin Dashboard")
-    st.write("Welcome, Bernard!")
-
-def patient_records():
-    st.title("Patient Records")
-
-def smart_contracts():
-    st.title("Smart Contracts Ledger")
-
-def research_analytics():
-    st.title("Research Analytics")
-
-# Define the navigation structure with clean, labeled categories
-pg = st.navigation({
-    "📋 Clinical Workflows": [
-        st.Page(admin_dashboard, title="Admin Dashboard", icon="🏥"),
-        st.Page(patient_records, title="Patient Records", icon="📁")
-    ],
-    "⛓️ Blockchain & Security": [
-        st.Page(smart_contracts, title="Smart Contracts", icon="🔒"),
-    ],
-    "📊 System & Research": [
-        st.Page(research_analytics, title="Research Analytics", icon="📈")
-    ]
-})
-
-# Run the selected page
-pg.run()
+        "Navigation",
+        [
+            "Admin Dashboard",
+            "Patient Records",
+            "Smart Contracts",
+            "Blockchain Ledger",
+            "Security Analytics",
+            "Interoperability Simulation",
+            "Research Analytics",
+            "Immutability Verification",
+            "Referral Workflow",
+            "Export Reports",
+            "Activity Logs"
+        ]
     )
 
 elif role == "Doctor":
@@ -1158,17 +1140,14 @@ elif menu == "Referral Center":
 elif menu == "Nurse Dashboard":
 
     st.title("👩‍⚕ Nurse Dashboard")
-# Instead of a plain white block, try a subtle, styled tip container:
-import streamlit as st
 
-# 2. Render your card
-st.markdown("""
-    <div class='metric-card'>
-    💡 def blue_text(text):
-    return f"\033[94m{<strong>Nurse Operations:</strong> Nurses can monitor patients, 
-    track referral times, and observe hospital workflows in real-time.}\033[0m"
+    st.markdown("""
+    <div class='card'>
+    Nurses can monitor patients,
+    track referral times,
+    and observe hospital workflows.
     </div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
