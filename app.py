@@ -687,7 +687,7 @@ if menu == "Admin Dashboard":
         <div class='metric-card'>
         <h1>{len(df)}</h1>
         <p>Total Participants</p>
-        <p>IT staff(admin), Doctors, Nurses, Patients</p>
+        <p>IT staff(admin), Doctors, Nurses, Patients)</p>
         </div>
         """, unsafe_allow_html=True)
 
