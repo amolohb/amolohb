@@ -613,7 +613,7 @@ if st.sidebar.button("Logout"):
 # ==========================================
 if role == "Admin":
 
-    menu = st.sidebar.radio(
+     menu = st.sidebar.radio(
         "Navigation",
         [
             "Admin Dashboard",
